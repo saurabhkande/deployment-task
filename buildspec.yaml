@@ -1,0 +1,35 @@
+version: 0.2
+
+
+phases:
+  pre_build:
+    commands:
+      - echo "Getting the credentials"
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      #- curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      #- unzip awscliv2.zip
+      #- sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+      - $(aws ecr get-login --no-include-email --region ap-south-1)
+      - REPOSITORY_URI=787367675716.dkr.ecr.ap-south-1.amazonaws.com/ssk-ecr-repo
+      
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images..
+      - docker push $REPOSITORY_URI:latest
+      - echo "Image sucessfully pushed to ECR Repo"
+      - echo "Creating the new task definition with updated image"
+      - aws ecs register-task-definition --cli-input-json file://taskdef.json
+      - aws ecs describe-task-definition  --task-definition Poc-task-definition | awk '/revision/ {print $4}'
+      - echo "Task definition with new revision created sucessfully"
+      - echo "Triggering the lambda function"
+      - aws lambda invoke --function-name poc_function output.json
+
+      
